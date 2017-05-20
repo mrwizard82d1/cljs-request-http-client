@@ -19,17 +19,47 @@
   [url-or-opts callback]
   (js-request (clj->js url-or-opts) callback))
 
+;; The rub with callbacks is that all  the work must be done at the leaves of the calling tree. 
+;; It does not seem to support inversion of control (although I might mimic this by passing additional
+;; callbacks through the calling tree).
+(defn- when-response-received [error response body]
+    ;; Separate this response from others - but how do I print the request?
+    (println)
+    (println)
+  (cond 
+    ;; Print the body if no error and HTTP status code 200
+    (and (not error) (= 200 (.-statusCode response))) 
+    (println body)
+    ;; Print the error and, optionally, the status code if available.
+    error 
+    (do (println "Error requesting resource") 
+        (println "  Name:" (.-name error))
+        (println "  Message:" (.-message error))
+        (when response
+          (println "HTTP status:"(.-statusCode response))))
+    ;; Print the status code and body if not HTTP status code 200
+    :else
+    (do (println "HTTP status: "(.-statusCode response))
+        (println "Non-200 body")
+        (println body))))
+
 ;; Simply to test the `request` function
-(defn test-request []
-  (request {;; Issue an HTTP GET for the resource identified by `:uri`
-            :method "GET"
-            :uri "http://www.google.com"}
-           (fn [error response body]
-             (when (and (not error) (= 200 (.-statusCode response)))
-               (println body)))))
+;;
+;; Callbacks means that I cannot return the response to the caller....
+;; but must handle the details in the callback.
+(defn test-requests []
+  (println "The requests may *not* print in the order issued. Asynchrony.")
+  (println)
+  (doseq [uri ["http://httpbin.org/html" 
+               "http://httpbin.org/redirect-to?url=http://httpbin.org/get"
+               "http://httpbin.org/htm"
+               "http://mollint@trepiatis@int"]]
+    (request {:method "GET"
+              :uri uri}
+             when-response-received)))
 
 (defn main [& args]
   (println "Abracadabra!") ; just for "debugging"
-  (test-request))
+  (test-requests))
 
 (set! *main-cli-fn* main)
