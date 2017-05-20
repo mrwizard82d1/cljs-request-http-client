@@ -1,0 +1,22 @@
+{
+  "name": "cljs-request-http-client",
+  "version": "1.0.0",
+  "description": "A simple ClojureScript HTTP client in Node.js using requests and channels",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrwizard82d1/cljs-request-http-client.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mrwizard82d1/cljs-request-http-client/issues"
+  },
+  "homepage": "https://github.com/mrwizard82d1/cljs-request-http-client#readme",
+  "devDependencies": {
+    "request": "^2.81.0"
+  }
+}

@@ -3,7 +3,10 @@
 
 (nodejs/enable-util-print!)
 
+(def ^:private js-request (nodejs/require "request"))
+
 (defn main [& args]
-  (println "Abracadabra!"))
+  (println "Abracadabra!")
+  (println js-request))
 
 (set! *main-cli-fn* main)
