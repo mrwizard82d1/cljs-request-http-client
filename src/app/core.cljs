@@ -5,6 +5,7 @@
 
 (nodejs/enable-util-print!)
 
+;; The private `request` module
 (def ^:private js-request (nodejs/require "request"))
 
 (defn request 
@@ -16,25 +17,36 @@
   This function returns a channel for asynchronous reads and writes. The (local) callback function will
   write the response to this channel when available. The caller can read the response at her leisure."
   [url-or-opts]
+  ;; Create a channel capable of buffering a single item
   (let [channel (async/chan 1)]
+    ;; Make the HTTP request using the `request` package
     (js-request (clj->js url-or-opts)
                 (fn [error response body]
+                  ;; The callback asynchronously puts the result on the channel
                   (async/put! channel 
                               (if error 
+                                ;; If an error occurred, put the error details
                                 {:error error}
+                                ;; Otherwise, put the response (headers) and the body on the channel
                                 {:response response
                                  :body body})
+                              ;; When complete, close the channel.
                               #(async/close! channel))))
     channel))
 
 (defn main [& args]
-  (println "Abracadabra!")
+  (println "Abracadabra!") ; Just for debugging
+  ;; `go` asynchronousely executes its body
   (async-m/go 
+    ;; Retrieve a result from the channel returned by `request`
     (let [result (async/<! (request "http://httpbin.org/html"))]
-      (cond (:error result) (println (:error result))
-            :else (do
-                    (println (.-statusCode (:response result)))
-                    (println (:body result)))))))
+      (cond 
+        ;; If channel contains an error, report it
+        (:error result) (println (:error result))
+        ;; Otherwise, print the HTTP status code and the HTTP body
+        :else (do
+                (println (.-statusCode (:response result)))
+                (println (:body result)))))))
 
 
 (set! *main-cli-fn* main)
