@@ -9,6 +9,10 @@
 ;; The private `request` module
 (def ^:private js-request (nodejs/require "request"))
 
+;; Define separate channels for successful responses and for error responses
+(def success-channel (async/chan 5))
+(def error-channel (async/chan 5))
+
 (defn request 
   "Request an internet resource.
 
@@ -19,39 +23,33 @@
   write the response to this channel when available. The caller can read the response at her leisure."
   [url-or-opts]
   ;; Create a channel capable of buffering a single item
-  (let [channel (async/chan 1)]
+  (let [all-channels (success-channel error-channel)]
     ;; Make the HTTP request using the `request` package
     (js-request (clj->js url-or-opts)
                 (fn [error response body]
-                  ;; The callback asynchronously puts the result on the channel
-                  (async/put! channel 
-                              (if error 
-                                ;; If an error occurred, put the error details
-                                {:error error}
-                                ;; Otherwise, put the response (headers) and the body on the channel
-                                {:response response
-                                 :body body})
-                              ;; When complete, close the channel.
-                              #(async/close! channel))))
-    channel))
+                  ;; Put errors and regular responses on *different* channels
+                  (if error
+                    (async/put! error-channel error)
+                    (async/put! success-channel {:response response :body body}))))
+    all-channels))
 
 (defn main [& args]
   (println "Abracadabra!") ; Just for debugging
+  ;; Issue multiple requests
   (doseq [url ["http://httpbin.org/html" 
                "http://httpbin.org/redirect-to?url=http://httpbin.org/get"
                "http://httpbin.org/htm"
                "http://mollint@trepiatis@int"]]
-    ;; `go` asynchronousely executes its body
-    (async-m/go 
-      ;; Retrieve a result from the channel returned by `request`
-      (match [(async/<! (request url))]
-             [{:error error}] (do (println "Error requesting" url)
-                                  (println "  Name:" (.-name error))
-                                  (println "  Message" (.-message error)))
-             [{:response response-headers :body body}] (do 
-                                                         (println "HTTP status:" 
-                                                                  (.-statusCode response-headers))
-                                                         (println "HTTP body:" 
-                                                                  body))))))
+    (request url))
+  ;; `go` asynchronousely executes its body
+  (async-m/go 
+    (let [[result ch] (async/alts! [success-channel error-channel])]
+      (case ch
+        success-channel (do 
+                          (println "HTTP status:" (.-statusCode (:response result)))
+                          (println "HTTP body:" (:body result)))
+        error-channel (do (println "Error requesting" url)
+                          (println "  Name:" (.-name (:error result)))
+                          (println "  Message" (.-message (:error result))))))))
 
 (set! *main-cli-fn* main)
