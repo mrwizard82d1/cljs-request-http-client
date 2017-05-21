@@ -1,6 +1,7 @@
 (ns app.core
   (:require [cljs.nodejs :as nodejs]
-            [cljs.core.async :as async])
+            [cljs.core.async :as async]
+            [cljs.core.match :refer-macros [match]])
   (:require-macros [cljs.core.async.macros :as async-m]))
 
 (nodejs/enable-util-print!)
@@ -36,17 +37,21 @@
 
 (defn main [& args]
   (println "Abracadabra!") ; Just for debugging
-  ;; `go` asynchronousely executes its body
-  (async-m/go 
-    ;; Retrieve a result from the channel returned by `request`
-    (let [result (async/<! (request "http://httpbin.org/html"))]
-      (cond 
-        ;; If channel contains an error, report it
-        (:error result) (println (:error result))
-        ;; Otherwise, print the HTTP status code and the HTTP body
-        :else (do
-                (println (.-statusCode (:response result)))
-                (println (:body result)))))))
-
+  (doseq [url ["http://httpbin.org/html" 
+               "http://httpbin.org/redirect-to?url=http://httpbin.org/get"
+               "http://httpbin.org/htm"
+               "http://mollint@trepiatis@int"]]
+    ;; `go` asynchronousely executes its body
+    (async-m/go 
+      ;; Retrieve a result from the channel returned by `request`
+      (match [(async/<! (request url))]
+             [{:error error}] (do (println "Error requesting" url)
+                                  (println "  Name:" (.-name error))
+                                  (println "  Message" (.-message error)))
+             [{:response response-headers :body body}] (do 
+                                                         (println "HTTP status:" 
+                                                                  (.-statusCode response-headers))
+                                                         (println "HTTP body:" 
+                                                                  body))))))
 
 (set! *main-cli-fn* main)
